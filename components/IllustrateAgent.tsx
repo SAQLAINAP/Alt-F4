@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { UserPersona, StoryStyle } from '../types';
+import { UserPersona, StoryStyle, INDIAN_LANGUAGES } from '../types';
 import { generateIllustrativeStory } from '../services/geminiService';
-import { PenTool, Sparkles, BookOpen, Clapperboard } from 'lucide-react';
+import { PenTool, Sparkles, BookOpen, Clapperboard, Globe } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface IllustrateAgentProps {
@@ -18,13 +18,14 @@ const UNIVERSES: StoryStyle[] = [
 export const IllustrateAgent: React.FC<IllustrateAgentProps> = ({ persona, addXp }) => {
   const [inputText, setInputText] = useState('');
   const [selectedUniverse, setSelectedUniverse] = useState<StoryStyle>('Stranger Things');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('English');
   const [story, setStory] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
     if (!inputText.trim()) return;
     setLoading(true);
-    const result = await generateIllustrativeStory(inputText, selectedUniverse, persona);
+    const result = await generateIllustrativeStory(inputText, selectedUniverse, persona, selectedLanguage);
     setStory(result);
     setLoading(false);
     addXp(100);
@@ -38,12 +39,13 @@ export const IllustrateAgent: React.FC<IllustrateAgentProps> = ({ persona, addXp
         </div>
         <div>
           <h2 className="text-2xl font-bold uppercase text-[#8CBED6]">Illustrate Mode</h2>
-          <p className="text-sm font-medium text-[#E0E0E0]">Explain concepts via Pop Culture</p>
+          <p className="text-sm font-medium text-[#E0E0E0]">Generate Concept Posters</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
-        <div className="space-y-4 flex flex-col">
+        {/* INPUT COLUMN */}
+        <div className="space-y-4 flex flex-col h-full">
           <div>
             <label className="block font-bold mb-2 flex items-center gap-2 text-[#FFE066]">
               <BookOpen size={18} /> SOURCE TOPIC / TEXT
@@ -52,22 +54,22 @@ export const IllustrateAgent: React.FC<IllustrateAgentProps> = ({ persona, addXp
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Paste complex text or topic here..."
-              className="w-full h-40 bg-[#1A1A1A] text-white border-2 border-[#404040] p-3 font-medium focus:outline-none focus:border-[#8CBED6] resize-none"
+              className="w-full h-32 bg-[#1A1A1A] text-white border-2 border-[#404040] p-3 font-medium focus:outline-none focus:border-[#8CBED6] resize-none"
             />
           </div>
 
-          <div className="flex-1">
+          <div className="flex-1 min-h-0 flex flex-col">
             <label className="block font-bold mb-2 flex items-center gap-2 text-[#FFE066]">
               <Sparkles size={18} /> CHOOSE UNIVERSE
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[200px] overflow-y-auto border-2 border-[#404040] p-2 bg-[#1A1A1A]">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 overflow-y-auto border-2 border-[#404040] p-2 bg-[#1A1A1A] flex-1">
               {UNIVERSES.map((universe) => (
                 <button
                   key={universe}
                   onClick={() => setSelectedUniverse(universe)}
                   className={`p-2 text-xs font-bold transition-all border-2 text-left truncate ${selectedUniverse === universe
-                      ? 'bg-[#8CBED6] border-black text-black'
-                      : 'bg-[#262626] border-transparent text-[#E0E0E0] hover:border-[#FFE066]'
+                    ? 'bg-[#8CBED6] border-black text-black'
+                    : 'bg-[#262626] border-transparent text-[#E0E0E0] hover:border-[#FFE066]'
                     }`}
                 >
                   {universe}
@@ -76,30 +78,45 @@ export const IllustrateAgent: React.FC<IllustrateAgentProps> = ({ persona, addXp
             </div>
           </div>
 
+          <div>
+            <label className="block font-bold mb-2 flex items-center gap-2 text-[#FFE066]">
+              <Globe size={18} /> LANGUAGE
+            </label>
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="w-full bg-[#1A1A1A] border-2 border-[#404040] text-white p-2 font-bold focus:outline-none focus:border-[#8CBED6]"
+            >
+              {INDIAN_LANGUAGES.map(lang => (
+                <option key={lang} value={lang}>{lang}</option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={handleGenerate}
             disabled={loading || !inputText}
-            className="w-full mt-auto bg-[#FFE066] text-black py-4 font-bold text-lg border-2 border-black hover:bg-[#E6C64C] disabled:opacity-50 shadow-[4px_4px_0px_0px_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_black] transition-all"
+            className="w-full bg-[#FFE066] text-black py-4 font-bold text-lg border-2 border-black hover:bg-[#E6C64C] disabled:opacity-50 shadow-[4px_4px_0px_0px_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_black] transition-all"
           >
-            {loading ? "DIRECTING SCENE..." : "GENERATE EPISODE"}
+            {loading ? "DESIGNING POSTER..." : "GENERATE POSTER"}
           </button>
         </div>
 
-        <div className="relative flex flex-col h-full min-h-[400px]">
+        {/* OUTPUT COLUMN */}
+        <div className="relative flex flex-col h-full min-h-[500px]">
           <div className="absolute top-0 right-0 bg-[#FFE066] text-black px-3 py-1 text-xs font-bold border-2 border-black transform -translate-y-3 translate-x-3 z-10">
-            SCENE OUTPUT
+            POSTER OUTPUT
           </div>
-          <div className="flex-1 border-2 border-[#404040] bg-[#1A1A1A] p-6 overflow-y-auto">
+          <div className="flex-1 border-2 border-[#404040] bg-[#1A1A1A] p-2 overflow-hidden flex items-center justify-center">
             {story ? (
-              <div className="prose prose-sm prose-invert font-medium text-[#E0E0E0]">
-                <ReactMarkdown>
-                  {story}
-                </ReactMarkdown>
-              </div>
+              <div
+                className="w-full h-full shadow-lg flex items-center justify-center bg-black/20"
+                dangerouslySetInnerHTML={{ __html: story }}
+              />
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-[#404040]">
                 <PenTool size={48} className="mb-2" />
-                <p className="font-bold text-center">EPISODE SCRIPT WILL APPEAR HERE</p>
+                <p className="font-bold text-center">POSTER WILL APPEAR HERE</p>
               </div>
             )}
           </div>

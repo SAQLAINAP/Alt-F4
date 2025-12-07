@@ -20,7 +20,7 @@ export const generateVisionAnalysis = async (
 ): Promise<string> => {
   const systemInstruction = `You are a Vision Tutor Agent for a ${persona}. Analyze the provided image or document. 
   Explain the concepts in detail in ${language}. Output Markdown.`;
-  
+
   try {
     const response = await ai.models.generateContent({
       model: MODEL_PRO_VISION,
@@ -70,21 +70,37 @@ export const createCoachChat = (persona: UserPersona): Chat => {
 export const generateIllustrativeStory = async (
   content: string,
   style: StoryStyle,
-  persona: UserPersona
+  persona: UserPersona,
+  language: string = 'English'
 ): Promise<string> => {
   try {
     const response = await ai.models.generateContent({
       model: MODEL_FLASH,
-      contents: `Explain the following topic/text as if it were a plot/scene from the universe of "${style}". 
+      contents: `Create a highly detailed, artistic SVG POSTER illustrating the following concept: "${content}".
+      
+      Art Style: The universe of "${style}".
       Target Audience: ${persona}.
+      Language: ${language}.
+      
+      REQUIREMENTS:
+      1. Output ONLY valid SVG code. Do not wrap in markdown code blocks.
+      2. The SVG should have a viewBox of "0 0 500 750" (Portrait Poster ratio).
+      3. Use a rich color palette appropriate for the style (e.g., Neon for Cyberpunk, Parchment/Gold for Harry Potter, Retro for Stranger Things).
+      4. Include the "Topic" as a stylized title within the poster.
+      5. The TEXT in the poster (Title, labels, descriptions) MUST be in the language: "${language}".
+      6. Make it visually striking and complex.
       
       Topic:
       ${content}`,
-      config: { temperature: 0.9 }
+      config: { temperature: 1.0 } // High creativity
     });
-    return response.text || "Story generation failed.";
+
+    let text = response.text || "";
+    // Clean markdown if present
+    text = text.replace(/```svg/g, '').replace(/```xml/g, '').replace(/```/g, '').trim();
+    return text.startsWith('<svg') ? text : "<svg viewBox='0 0 500 500'><text y='50'>Failed to generate valid SVG</text></svg>";
   } catch (error) {
-    return "The Illustrate Agent is offline.";
+    return "<svg viewBox='0 0 500 500'><text y='50'>Agent Offline</text></svg>";
   }
 };
 
@@ -122,7 +138,7 @@ export const generateSpeechTTS = async (text: string, language: string): Promise
   try {
     // Clean text to remove markdown symbols for better speech
     const cleanText = text.replace(/[*#_`]/g, '');
-    
+
     const response = await ai.models.generateContent({
       model: MODEL_TTS,
       contents: [{ parts: [{ text: `Speak in ${language}: ${cleanText.slice(0, 400)}` }] }], // Limit char count for demo speed
@@ -133,7 +149,7 @@ export const generateSpeechTTS = async (text: string, language: string): Promise
         },
       },
     });
-    
+
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (base64Audio) {
       const binaryString = atob(base64Audio);
