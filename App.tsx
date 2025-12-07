@@ -15,8 +15,8 @@ import { Eye, MessageCircle, Clapperboard, BookOpen } from 'lucide-react';
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [persona, setPersona] = useState<UserPersona | null>(null);
-  const [xp, setXp] = useState(1250);
-  const [streak, setStreak] = useState(5);
+  const [xp, setXp] = useState(0);
+  const [streak, setStreak] = useState(0);
 
   // Check for existing session on mount
   useEffect(() => {

@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import { UserPersona, INDIAN_LANGUAGES } from '../types';
 import { generateLessonContent, translateText } from '../services/geminiService';
-import { STATIC_LESSONS, DEFAULT_LESSON } from '../data/staticLessons';
-import { Book, ChevronRight, ArrowLeft, Loader2, BookOpen, Globe } from 'lucide-react';
+import { STATIC_LESSONS } from '../data/staticLessons';
+import {
+  Book, ChevronRight, ArrowLeft, Loader2, BookOpen, Globe,
+  Atom, FlaskConical, Dna, Calculator, Cpu, Globe2, Briefcase,
+  Landmark, Palette, Feather, FileText, Users, TrendingUp,
+  BrainCircuit, Code, Mail, DollarSign, Layers, Server,
+  Target, Handshake, HeartHandshake, Smile, Coffee
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface LessonsAgentProps {
@@ -27,12 +33,83 @@ const SUBJECTS_MAP: Record<UserPersona, string[]> = {
   ]
 };
 
-// Mock lesson titles for demo (in real app, these could also be generated)
-const LESSON_TITLES = [
-  "Introduction & Fundamentals", "Core Concepts Deep Dive", "Advanced Techniques",
-  "Case Studies", "Modern Applications", "Common Pitfalls", "Expert Best Practices",
-  "Future Trends", "Practical Workshop", "Final Review"
-];
+const SUBJECT_ICONS: Record<string, React.ReactNode> = {
+  // Student
+  'Physics': <Atom size={40} />,
+  'Chemistry': <FlaskConical size={40} />,
+  'Biology': <Dna size={40} />,
+  'Mathematics': <Calculator size={40} />,
+  'Computer Science': <Cpu size={40} />,
+  'Humanities': <Globe2 size={40} />,
+  'Geography': <Globe size={40} />,
+  'Economics': <TrendingUp size={40} />,
+  'English Literature': <Feather size={40} />,
+  'Arts': <Palette size={40} />,
+
+  // Fresher
+  'Resume Building': <FileText size={40} />,
+  'Interview Preparation': <Users size={40} />,
+  'Aptitude Tests': <BrainCircuit size={40} />,
+  'Data Structures': <Code size={40} />,
+  'System Design Basics': <Layers size={40} />,
+  'Soft Skills': <Smile size={40} />,
+  'Corporate Etiquette': <Briefcase size={40} />,
+  'LinkedIn Growth': <TrendingUp size={40} />,
+  'Email Writing': <Mail size={40} />,
+  'Basic Finance': <DollarSign size={40} />,
+
+  // Experienced
+  'System Architecture': <Server size={40} />,
+  'Team Leadership': <Users size={40} />,
+  'Project Management': <Target size={40} />,
+  'Agile Methodologies': <Layers size={40} />,
+  'Cloud Computing': <Cpu size={40} />,
+  'Strategic Planning': <TrendingUp size={40} />,
+  'Negotiation': <Handshake size={40} />,
+  'Mentorship': <HeartHandshake size={40} />,
+  'Work-Life Balance': <Coffee size={40} />,
+  'Financial Independence': <Landmark size={40} />,
+};
+
+const SUBJECT_MODULES: Record<string, string[]> = {
+  // Student
+  'Physics': ["Kinematics", "Dynamics", "Thermodynamics", "Electromagnetism", "Optics", "Quantum Physics", "Nuclear Physics", "Relativity"],
+  'Chemistry': ["Atomic Structure", "Chemical Bonding", "Periodic Table", "Stoichiometry", "Organic Chemistry", "Electrochemistry", "Thermodynamics", "Polymers"],
+  'Biology': ["Cell Structure", "Genetics", "Evolution", "Human Physiology", "Plant Biology", "Ecology", "Biotechnology", "Microbiology"],
+  'Mathematics': ["Algebra", "Calculus", "Trigonometry", "Geometry", "Statistics", "Probability", "Vectors", "Matrices"],
+  'Computer Science': ["Algorithms", "Data Structures", "Operating Systems", "DBMS", "Computer Networks", "Web Development", "AI/ML Basics", "Cybersecurity"],
+  'Humanities': ["Ancient History", "Modern World History", "Sociology Basics", "Psychology 101", "Political Science", "anthropology", "Philosophy", "Ethics"],
+  'Geography': ["Physical Geography", "Human Geography", "Climatology", "Oceanography", "Cartography", "Environmental Studies", "Resources", "Demographics"],
+  'Economics': ["Microeconomics", "Macroeconomics", "International Trade", "Public Finance", "Development Economics", "Game Theory", "Econometrics", "Banking"],
+  'English Literature': ["Shakespearean Drama", "Victorian Era", "Modernism", "Poetry Analysis", "Literary Criticism", "American Literature", "Post-Colonial Lit", "Creative Writing"],
+  'Arts': ["Art History", "Color Theory", "Sketching Basics", "Modern Art", "Perspective Drawing", "Digital Art", "Sculpting", "Photography"],
+
+  // Fresher
+  'Resume Building': ["Structuring Your Resume", "Action Verbs & Impact", "Tailoring for ATS", "Project Showcasing", "Education & certifications", "Common Mistakes", "Cover Letters", "LinkedIn optimization"],
+  'Interview Preparation': ["Behavioral Questions", "Technical Screening", "System Design Rounds", "Mock Interviews", "Salary Negotiation", "Body Language", "Addressing Weaknesses", "Follow-up Etiquette"],
+  'Aptitude Tests': ["Quantitative Aptitude", "Logical Reasoning", "Verbal Ability", "Data Interpretation", "Puzzles", "Abstract Reasoning", "Speed Maths", "Practice Sets"],
+  'Data Structures': ["Arrays & Strings", "Linked Lists", "Stacks & Queues", "Trees & Graphs", "Hashing", "Heaps", "Dynamic Programming", "Recursion"],
+  'System Design Basics': ["Load Balancing", "Caching", "Database Sharding", "Vertical vs Horizontal Scaling", "Microservices", "API Design", "Message Queues", "Consistent Hashing"],
+  // Add generics for others to save space/time while still being better than generic numbers
+  'Soft Skills': ["Communication", "Empathy", "Time Management", "Adaptability"],
+  'Corporate Etiquette': ["Email Manners", "Meeting Protocols", "Dress Code", "Networking"],
+  'LinkedIn Growth': ["Profile Optimization", "Networking Strategy", "Content Creation", "Personal Branding"],
+  'Email Writing': ["Formal vs Informal", "Cold Emailing", "Follow-ups", "Subject Lines"],
+  'Basic Finance': ["Budgeting", "Investing 101", "Taxes", "Credit Scores"],
+
+  // Experienced
+  'System Architecture': ["Microservices Patterns", "Event-Driven Arch", "Serverless", "Distributed Systems", "High Availability", "Fault Tolerance", "Observability", "Security by Design"],
+  'Team Leadership': ["Conflict Resolution", "Motivating Teams", "Delegation", "Hiring & Onboarding", "Performance Reviews", "Culture Building", "Remote Management", "Crisis Management"],
+  'Project Management': ["Agile vs Waterfall", "Scrum Framework", "Risk Management", "Stakeholder Comm", "Budgeting", "Resource Allocation", "Timeline Planning", "Quality Assurance"],
+  'Agile Methodologies': ["Scrum", "Kanban", "XP", "Sprint Planning", "Retrospectives", "User Stories", "Backlog Grooming", "Velocity Tracking"],
+  'Cloud Computing': ["AWS Services", "Azure Fundamentals", "GCP Overview", "Docker & Kubernetes", "CI/CD Pipelines", "IaC (Terraform)", "Cloud Security", "Cost Optimization"],
+  // ... generics for rest
+  'Strategic Planning': ["SWOT Analysis", "OKR Framework", "Long-term Vision", "Competitive Analysis"],
+  'Negotiation': ["Win-Win Strategies", "Contract Negotiation", "Conflict Management", "Persuasion"],
+  'Mentorship': ["Guidance vs Instruction", "Career Pathing", "Feedback Loops", "Sponsorship"],
+  'Work-Life Balance': ["Burnout Prevention", "Time Blocking", "Setting Boundaries", "Remote Work Health"],
+  'Financial Independence': ["FIRE Movement", "Passive Income", "Real Estate", "Stock Market Strategies"]
+};
 
 export const LessonsAgent: React.FC<LessonsAgentProps> = ({ persona, addXp }) => {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
@@ -142,16 +219,23 @@ export const LessonsAgent: React.FC<LessonsAgentProps> = ({ persona, addXp }) =>
   }
 
   if (selectedSubject) {
+    const modules = SUBJECT_MODULES[selectedSubject] || ["Introduction", "Core Concepts", "Advanced Topics", "Case Studies", "Summary"];
+
     return (
       <div className="bg-[#262626] border-4 border-[#FFE066] shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)] h-[calc(100vh-140px)] flex flex-col">
         <div className="p-4 border-b-2 border-[#FFE066] flex items-center gap-4 bg-[#1A1A1A]">
           <button onClick={() => setSelectedSubject(null)} className="hover:text-[#FFE066] text-[#E0E0E0]">
             <ArrowLeft size={24} />
           </button>
-          <h2 className="text-2xl font-bold text-[#FFE066] uppercase">{selectedSubject} Module</h2>
+          <div className="flex items-center gap-3">
+            <div className="text-[#FFE066]">
+              {SUBJECT_ICONS[selectedSubject] || <Book size={24} />}
+            </div>
+            <h2 className="text-2xl font-bold text-[#FFE066] uppercase">{selectedSubject} Modules</h2>
+          </div>
         </div>
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto">
-          {LESSON_TITLES.map((title, idx) => (
+          {modules.map((title, idx) => (
             <button
               key={idx}
               onClick={() => handleLessonSelect(title)}
@@ -187,7 +271,9 @@ export const LessonsAgent: React.FC<LessonsAgentProps> = ({ persona, addXp }) =>
             onClick={() => setSelectedSubject(sub)}
             className="aspect-square bg-[#262626] border-4 border-[#404040] hover:border-[#FFE066] hover:-translate-y-1 transition-all flex flex-col items-center justify-center p-4 text-center group shadow-[4px_4px_0px_0px_black]"
           >
-            <Book size={40} className="text-[#8CBED6] mb-4 group-hover:scale-110 transition-transform" />
+            <div className="text-[#8CBED6] mb-4 group-hover:scale-110 transition-transform">
+              {SUBJECT_ICONS[sub] || <Book size={40} />}
+            </div>
             <span className="font-bold text-[#E0E0E0] group-hover:text-white uppercase text-sm md:text-base">{sub}</span>
           </button>
         ))}
