@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { UserPersona, AgentType, LearningContext, User } from './types';
 import { authService } from './services/authService';
+import { firestoreService } from './services/firestoreService';
 import { Layout } from './components/Layout';
 import { AuthScreen } from './components/AuthScreen';
 import { PersonaSelector } from './components/PersonaSelector';
@@ -19,10 +20,26 @@ const App: React.FC = () => {
 
   // Check for existing session on mount
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-    }
+    const unsubscribe = authService.onAuthStateChanged(async (user) => {
+      setUser(user);
+      if (user) {
+        try {
+          await firestoreService.saveUserProfile(user);
+          const profile = await firestoreService.getUserProfile(user.uid);
+          if (profile) {
+            if (profile.xp !== undefined) setXp(profile.xp);
+            if (profile.streak !== undefined) setStreak(profile.streak);
+            if (profile.persona !== undefined) setPersona(profile.persona as UserPersona);
+          }
+        } catch (error) {
+          console.error("Failed to sync with Firestore:", error);
+        }
+      } else {
+        setPersona(null);
+        // Optional: Reset XP/Streak or keep defaults
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleLogout = () => {
@@ -31,13 +48,27 @@ const App: React.FC = () => {
     setPersona(null);
   };
 
+  const handleSetPersona = (p: UserPersona | null) => {
+    setPersona(p);
+    if (user && p) {
+      firestoreService.updateStats(user.uid, { persona: p });
+    }
+  };
+
+  const handleAddXp = (amount: number) => {
+    setXp(prev => prev + amount);
+    if (user) {
+      firestoreService.addXp(user.uid, amount);
+    }
+  };
+
   const context: LearningContext = {
     user,
     persona,
     xp,
     streak,
-    setPersona,
-    addXp: (amount) => setXp(prev => prev + amount),
+    setPersona: handleSetPersona,
+    addXp: handleAddXp,
     logout: handleLogout
   };
 

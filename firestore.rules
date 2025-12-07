@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Helper Functions
+    // Check if user is logged in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is accessing their own document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Validate user profile data structure
+    function isValidUser() {
+      let incoming = request.resource.data;
+      return incoming.keys().hasAll(['uid', 'email']) &&
+             incoming.uid is string &&
+             incoming.uid == request.auth.uid && // UID in doc must match auth UID
+             (!incoming.keys().has('xp') || incoming.xp is number) &&
+             (!incoming.keys().has('streak') || incoming.streak is number);
+    }
+
+    // 2. Collection Rules
+    match /users/{userId} {
+      // Allow reading if it's the user's own profile
+      allow get: if isAuthenticated() && isOwner(userId);
+      allow list: if false; // Don't allow listing all users
+
+      // Allow creating/updating only if it's their own profile AND data is valid
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser();
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser();
+      
+      // Allow delete only if it's the owner
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Default: Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

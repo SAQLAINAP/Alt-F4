@@ -21,8 +21,11 @@ export interface Message {
 }
 
 export interface User {
-  username: string;
-  password?: string;
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  username: string; // compatibility with existing code, will use displayName or email part
 }
 
 export interface LearningContext {
@@ -35,10 +38,10 @@ export interface LearningContext {
   logout: () => void;
 }
 
-export type StoryStyle = 
-  | 'Stranger Things' | 'Marvel' | 'Tech Noir' | 'Shakespeare' 
-  | 'Harry Potter' | 'Star Wars' | 'Game of Thrones' | 'Rick and Morty' 
-  | 'Sherlock Holmes' | 'Lord of the Rings' | 'The Matrix' | 'Anime (Shonen)' 
+export type StoryStyle =
+  | 'Stranger Things' | 'Marvel' | 'Tech Noir' | 'Shakespeare'
+  | 'Harry Potter' | 'Star Wars' | 'Game of Thrones' | 'Rick and Morty'
+  | 'Sherlock Holmes' | 'Lord of the Rings' | 'The Matrix' | 'Anime (Shonen)'
   | 'Pixar' | 'Wes Anderson' | 'Cyberpunk 2077';
 
 export const INDIAN_LANGUAGES = [

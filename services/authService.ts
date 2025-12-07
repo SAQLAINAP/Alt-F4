@@ -1,41 +1,60 @@
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { auth } from './firebase'; // Adjust path if needed
 import { User } from '../types';
 
-const USERS_KEY = 'cc_users';
-const SESSION_KEY = 'cc_session';
-
 export const authService = {
-  register: (username: string, password: string): boolean => {
-    const usersStr = localStorage.getItem(USERS_KEY);
-    const users: User[] = usersStr ? JSON.parse(usersStr) : [];
-    
-    if (users.find(u => u.username === username)) {
-      return false; // User exists
-    }
-
-    const newUser = { username, password };
-    users.push(newUser);
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    return true;
+  // Map Firebase User to App User
+  mapUser: (firebaseUser: FirebaseUser): User => {
+    return {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName,
+      photoURL: firebaseUser.photoURL,
+      username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User'
+    };
   },
 
-  login: (username: string, password: string): User | null => {
-    const usersStr = localStorage.getItem(USERS_KEY);
-    const users: User[] = usersStr ? JSON.parse(usersStr) : [];
-    
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-      return user;
-    }
-    return null;
+  register: async (email: string, password: string): Promise<User> => {
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    return authService.mapUser(result.user);
   },
 
-  logout: () => {
-    localStorage.removeItem(SESSION_KEY);
+  login: async (email: string, password: string): Promise<User> => {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    return authService.mapUser(result.user);
+  },
+
+  loginWithGoogle: async (): Promise<User> => {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    return authService.mapUser(result.user);
+  },
+
+  logout: async () => {
+    await signOut(auth);
   },
 
   getCurrentUser: (): User | null => {
-    const sessionStr = localStorage.getItem(SESSION_KEY);
-    return sessionStr ? JSON.parse(sessionStr) : null;
+    // Note: Firebase auth state is async. 
+    // This synchronous method might not work as expected for initial load if not already cached.
+    // However, for compatibility with existing App.tsx, we try to get current user.
+    // Ideally, App.tsx should subscribe to onAuthStateChanged.
+    const currentUser = auth.currentUser;
+    return currentUser ? authService.mapUser(currentUser) : null;
+  },
+
+  // New method to subscribe to auth state changes
+  onAuthStateChanged: (callback: (user: User | null) => void) => {
+    return onAuthStateChanged(auth, (firebaseUser) => {
+      callback(firebaseUser ? authService.mapUser(firebaseUser) : null);
+    });
   }
 };
