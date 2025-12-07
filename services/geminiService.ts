@@ -10,6 +10,43 @@ const MODEL_COACH = 'gemini-3-pro-preview';
 const MODEL_IMAGE = 'gemini-2.5-flash-image';
 const MODEL_VIDEO = 'veo-3.1-fast-generate-preview';
 
+// --- Multi-modal Audio Chat ---
+export const chatWithAudio = async (
+  audioBase64: string,
+  persona: UserPersona,
+  currentLanguage: string
+): Promise<{ text: string; audio?: ArrayBuffer }> => {
+  try {
+    const model = ai.models.generateContent({
+      model: MODEL_FLASH,
+      contents: {
+        parts: [
+          { inlineData: { mimeType: "audio/webm", data: audioBase64 } },
+          {
+            text: `You are a helpful Tutor for a ${persona}. 
+            1. IDENTIFY the language spoken in the audio.
+            2. If silence/noise, reply: "I couldn't hear you clearly."
+            3. Otherwise, ANSWER directly in that SAME language.
+            4. Keep the response short (max 2-3 sentences) suitable for speech.
+            ` }
+        ]
+      }
+    });
+
+    const response = await model;
+    const textResponse = response.text || "Sorry, I couldn't hear you clearly.";
+
+    // Generate TTS for the response
+    const ttsAudio = await generateSpeechTTS(textResponse, "the identified language"); // Language arg is used in prompt logic below
+
+    return { text: textResponse, audio: ttsAudio ? ttsAudio : undefined };
+
+  } catch (error) {
+    console.error("Audio Chat Error", error);
+    return { text: "Error processing audio." };
+  }
+};
+
 // --- Vision & Analysis (PDF/Image + Language + TTS) ---
 
 export const generateVisionAnalysis = async (
@@ -132,6 +169,27 @@ export const generateLessonContent = async (
   }
 };
 
+// --- Translation ---
+
+export const translateText = async (text: string, targetLanguage: string): Promise<string> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_FLASH,
+      contents: `Translate the following markdown text into ${targetLanguage}.
+      Keep the formatting (headers, bullet points, bold text) exactly the same.
+      Only translate the content.
+      
+      Text:
+      ${text}`,
+      config: { temperature: 0.3 }
+    });
+    return response.text || text;
+  } catch (error) {
+    console.error("Translation Error", error);
+    return text; // Return original on error
+  }
+};
+
 // --- TTS ---
 
 export const generateSpeechTTS = async (text: string, language: string): Promise<ArrayBuffer | null> => {
@@ -141,7 +199,7 @@ export const generateSpeechTTS = async (text: string, language: string): Promise
 
     const response = await ai.models.generateContent({
       model: MODEL_TTS,
-      contents: [{ parts: [{ text: `Speak in ${language}: ${cleanText.slice(0, 400)}` }] }], // Limit char count for demo speed
+      contents: [{ parts: [{ text: `Speak efficiently and clearly in the detected language: ${cleanText.slice(0, 400)}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserPersona, Message, INDIAN_LANGUAGES } from '../types';
-import { createTutorChat } from '../services/geminiService';
+import { createTutorChat, chatWithAudio } from '../services/geminiService';
 import { Chat, GenerateContentResponse } from "@google/genai";
-import { Send, MessageSquare, Loader2, Globe } from 'lucide-react';
+import { Send, MessageSquare, Loader2, Globe, Mic, MicOff, Volume2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface TutorAgentProps {
@@ -15,8 +15,12 @@ export const TutorAgent: React.FC<TutorAgentProps> = ({ persona, addXp }) => {
   const [input, setInput] = useState('');
   const [language, setLanguage] = useState('English');
   const [loading, setLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+
   const chatSession = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // Re-initialize chat when language changes
   useEffect(() => {
@@ -60,6 +64,81 @@ export const TutorAgent: React.FC<TutorAgentProps> = ({ persona, addXp }) => {
     }
   };
 
+  const startRecording = async () => {
+    setIsRecording(true);
+    audioChunksRef.current = [];
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await processAudio(audioBlob);
+        stream.getTracks().forEach(track => track.stop()); // Stop mic
+      };
+
+      mediaRecorder.start();
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      setIsRecording(false);
+      alert("Microphone access denied or not available.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const processAudio = async (audioBlob: Blob) => {
+    setLoading(true);
+    // Convert Blob to Base64
+    const reader = new FileReader();
+    reader.readAsDataURL(audioBlob);
+    reader.onloadend = async () => {
+      const base64Audio = (reader.result as string).split(',')[1];
+
+      // Add optimistic user message (placeholder)
+      const tempId = Date.now().toString();
+      setMessages(prev => [...prev, { id: tempId, role: 'user', content: "🎤 [Audio Message]", timestamp: Date.now() }]);
+
+      try {
+        const { text, audio } = await chatWithAudio(base64Audio, persona, language);
+
+        // Update messages
+        setMessages(prev => [
+          ...prev.filter(m => m.id !== tempId), // Remove placeholder if we want detailed text, or keep it
+          { id: tempId, role: 'user', content: "🎤 [Audio Message Sent]", timestamp: Date.now() },
+          { id: (Date.now() + 1).toString(), role: 'model', content: text, timestamp: Date.now() }
+        ]);
+
+        // Play Audio Response
+        if (audio) {
+          const audioBlob = new Blob([audio], { type: 'audio/wav' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audioEl = new Audio(audioUrl);
+          audioEl.play();
+        }
+        addXp(20);
+
+      } catch (error) {
+        console.error(error);
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', content: "Error processing voice.", timestamp: Date.now() }]);
+      } finally {
+        setLoading(false);
+      }
+    };
+  };
+
   return (
     <div className="bg-[#262626] border-4 border-[#8CBED6] shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)] h-[calc(100vh-140px)] flex flex-col">
       <div className="p-4 border-b-2 border-[#8CBED6] flex flex-col md:flex-row items-center justify-between bg-[#1A1A1A] gap-4">
@@ -91,8 +170,8 @@ export const TutorAgent: React.FC<TutorAgentProps> = ({ persona, addXp }) => {
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] p-3 border-2 ${msg.role === 'user'
-                ? 'bg-[#FFE066] text-black border-black rounded-bl-xl rounded-tr-xl rounded-tl-xl shadow-[2px_2px_0px_0px_black]'
-                : 'bg-[#404040] text-white border-[#8CBED6] rounded-br-xl rounded-tr-xl rounded-tl-xl shadow-[2px_2px_0px_0px_black]'
+              ? 'bg-[#FFE066] text-black border-black rounded-bl-xl rounded-tr-xl rounded-tl-xl shadow-[2px_2px_0px_0px_black]'
+              : 'bg-[#404040] text-white border-[#8CBED6] rounded-br-xl rounded-tr-xl rounded-tl-xl shadow-[2px_2px_0px_0px_black]'
               }`}>
               <div className={`prose prose-sm ${msg.role === 'model' ? 'prose-invert' : ''}`}>
                 <ReactMarkdown>
@@ -106,7 +185,18 @@ export const TutorAgent: React.FC<TutorAgentProps> = ({ persona, addXp }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t-2 border-[#8CBED6] bg-[#1A1A1A] flex gap-2">
+      <div className="p-4 border-t-2 border-[#8CBED6] bg-[#1A1A1A] flex gap-2 items-center">
+        <button
+          onClick={isRecording ? stopRecording : startRecording}
+          className={`p-3 border-2 border-black transition-all ${isRecording
+            ? 'bg-red-500 text-white animate-pulse'
+            : 'bg-[#FFE066] text-black hover:bg-[#E6C64C] hover:translate-y-[-2px]'
+            }`}
+          title={isRecording ? "Stop Recording" : "Start Voice Chat"}
+        >
+          {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
+        </button>
+
         <input
           type="text"
           value={input}

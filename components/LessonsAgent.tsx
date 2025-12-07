@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { UserPersona } from '../types';
-import { generateLessonContent } from '../services/geminiService';
-import { Book, ChevronRight, ArrowLeft, Loader2, BookOpen } from 'lucide-react';
+import { UserPersona, INDIAN_LANGUAGES } from '../types';
+import { generateLessonContent, translateText } from '../services/geminiService';
+import { STATIC_LESSONS, DEFAULT_LESSON } from '../data/staticLessons';
+import { Book, ChevronRight, ArrowLeft, Loader2, BookOpen, Globe } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface LessonsAgentProps {
@@ -11,33 +12,36 @@ interface LessonsAgentProps {
 
 const SUBJECTS_MAP: Record<UserPersona, string[]> = {
   [UserPersona.STUDENT]: [
-    'Physics', 'Chemistry', 'Biology', 'Mathematics', 'Computer Science', 
+    'Physics', 'Chemistry', 'Biology', 'Mathematics', 'Computer Science',
     'Humanities', 'Geography', 'Economics', 'English Literature', 'Arts'
   ],
   [UserPersona.FRESHER]: [
-    'Resume Building', 'Interview Preparation', 'Aptitude Tests', 'Data Structures', 
-    'System Design Basics', 'Soft Skills', 'Corporate Etiquette', 'LinkedIn Growth', 
+    'Resume Building', 'Interview Preparation', 'Aptitude Tests', 'Data Structures',
+    'System Design Basics', 'Soft Skills', 'Corporate Etiquette', 'LinkedIn Growth',
     'Email Writing', 'Basic Finance'
   ],
   [UserPersona.EXPERIENCED]: [
-    'System Architecture', 'Team Leadership', 'Project Management', 'Agile Methodologies', 
-    'Cloud Computing', 'Strategic Planning', 'Negotiation', 'Mentorship', 
+    'System Architecture', 'Team Leadership', 'Project Management', 'Agile Methodologies',
+    'Cloud Computing', 'Strategic Planning', 'Negotiation', 'Mentorship',
     'Work-Life Balance', 'Financial Independence'
   ]
 };
 
 // Mock lesson titles for demo (in real app, these could also be generated)
 const LESSON_TITLES = [
-  "Introduction & Fundamentals", "Core Concepts Deep Dive", "Advanced Techniques", 
-  "Case Studies", "Modern Applications", "Common Pitfalls", "Expert Best Practices", 
+  "Introduction & Fundamentals", "Core Concepts Deep Dive", "Advanced Techniques",
+  "Case Studies", "Modern Applications", "Common Pitfalls", "Expert Best Practices",
   "Future Trends", "Practical Workshop", "Final Review"
 ];
 
 export const LessonsAgent: React.FC<LessonsAgentProps> = ({ persona, addXp }) => {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
-  const [lessonContent, setLessonContent] = useState<string>('');
+  const [originalContent, setOriginalContent] = useState<string>(''); // Always English
+  const [displayContent, setDisplayContent] = useState<string>(''); // Translated/Displayed
+  const [language, setLanguage] = useState('English');
   const [loading, setLoading] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   const subjects = SUBJECTS_MAP[persona] || SUBJECTS_MAP[UserPersona.STUDENT];
 
@@ -45,17 +49,55 @@ export const LessonsAgent: React.FC<LessonsAgentProps> = ({ persona, addXp }) =>
     if (!selectedSubject) return;
     setSelectedLesson(lesson);
     setLoading(true);
-    setLessonContent('');
-    
-    const content = await generateLessonContent(selectedSubject, lesson, persona);
-    setLessonContent(content);
-    setLoading(false);
+    setOriginalContent('');
+    setDisplayContent('');
+
+    // Try to get static content first
+    const key = `${selectedSubject}-${lesson}`;
+    let content = STATIC_LESSONS[key];
+
+    // Fallback if not found (for demo purposes, dynamic generation could still be an option, but user asked for "pregenerated")
+    if (!content) {
+      content = await generateLessonContent(selectedSubject, lesson, persona);
+    }
+
+    setOriginalContent(content);
+
+    // Initial display
+    if (language === 'English') {
+      setDisplayContent(content);
+      setLoading(false);
+    } else {
+      // Immediate translation if language is already selected
+      await handleTranslation(content, language);
+      setLoading(false);
+    }
+
     addXp(50);
+  };
+
+  const handleTranslation = async (text: string, lang: string) => {
+    if (lang === 'English') {
+      setDisplayContent(text);
+      return;
+    }
+    setTranslating(true);
+    const translated = await translateText(text, lang);
+    setDisplayContent(translated);
+    setTranslating(false);
+  };
+
+  const changeLanguage = async (newLang: string) => {
+    setLanguage(newLang);
+    if (originalContent) {
+      await handleTranslation(originalContent, newLang);
+    }
   };
 
   const resetView = () => {
     setSelectedLesson(null);
-    setLessonContent('');
+    setOriginalContent('');
+    setDisplayContent('');
   };
 
   if (selectedLesson) {
@@ -69,16 +111,29 @@ export const LessonsAgent: React.FC<LessonsAgentProps> = ({ persona, addXp }) =>
             <h2 className="text-xl font-bold text-[#FFE066] uppercase">{selectedSubject}</h2>
             <p className="text-xs font-bold text-[#E0E0E0]">{selectedLesson}</p>
           </div>
+
+          <div className="ml-auto flex items-center gap-2 bg-[#262626] border-2 border-[#404040] p-1 px-3">
+            <Globe size={16} className="text-[#FFE066]" />
+            <select
+              value={language}
+              onChange={(e) => changeLanguage(e.target.value)}
+              className="bg-transparent text-white font-bold text-sm focus:outline-none"
+            >
+              {INDIAN_LANGUAGES.map(lang => (
+                <option key={lang} value={lang} className="bg-[#262626]">{lang}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-6 bg-dots">
-          {loading ? (
-             <div className="h-full flex flex-col items-center justify-center text-[#FFE066]">
-               <Loader2 size={48} className="animate-spin mb-4"/>
-               <p className="font-bold text-xl">GENERATING LESSON...</p>
-             </div>
+          {loading || translating ? (
+            <div className="h-full flex flex-col items-center justify-center text-[#FFE066]">
+              <Loader2 size={48} className="animate-spin mb-4" />
+              <p className="font-bold text-xl">{translating ? 'TRANSLATING...' : 'PREPARING LESSON...'}</p>
+            </div>
           ) : (
             <div className="prose prose-invert prose-lg max-w-none">
-              <ReactMarkdown>{lessonContent}</ReactMarkdown>
+              <ReactMarkdown>{displayContent}</ReactMarkdown>
             </div>
           )}
         </div>
@@ -89,7 +144,7 @@ export const LessonsAgent: React.FC<LessonsAgentProps> = ({ persona, addXp }) =>
   if (selectedSubject) {
     return (
       <div className="bg-[#262626] border-4 border-[#FFE066] shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)] h-[calc(100vh-140px)] flex flex-col">
-         <div className="p-4 border-b-2 border-[#FFE066] flex items-center gap-4 bg-[#1A1A1A]">
+        <div className="p-4 border-b-2 border-[#FFE066] flex items-center gap-4 bg-[#1A1A1A]">
           <button onClick={() => setSelectedSubject(null)} className="hover:text-[#FFE066] text-[#E0E0E0]">
             <ArrowLeft size={24} />
           </button>
