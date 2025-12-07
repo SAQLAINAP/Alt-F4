@@ -1,0 +1,4 @@
+components/LiveInterviewAgent.tsx(28,45): error TS2345: Argument of type '{ model: string; config: { responseModalities: Modality.AUDIO[]; speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: string; }; }; }; systemInstruction: string; }; }' is not assignable to parameter of type 'LiveConnectParameters'.
+  Property 'callbacks' is missing in type '{ model: string; config: { responseModalities: Modality.AUDIO[]; speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: string; }; }; }; systemInstruction: string; }; }' but required in type 'LiveConnectParameters'.
+components/LiveInterviewAgent.tsx(41,19): error TS2339: Property 'receive' does not exist on type 'Session'.
+components/LiveInterviewAgent.tsx(43,46): error TS2339: Property 'receive' does not exist on type 'Session'.

@@ -1,0 +1,8 @@
+{
+  "name": "Career Companion",
+  "description": "A gamified, adaptive learning platform powered by Gemini agents with a neobrutalist design.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
