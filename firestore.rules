@@ -1,43 +1,61 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // 1. Helper Functions
-    // Check if user is logged in
+
+    // Helper: Check if user is logged in
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Check if user is accessing their own document
+
+    // Helper: Check if the user accessing the doc is the owner
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
-    // Validate user profile data structure
+
+    // Helper: Validate the data schema for Creates and Updates
     function isValidUser() {
       let incoming = request.resource.data;
-      return incoming.keys().hasAll(['uid', 'email']) &&
-             incoming.uid is string &&
-             incoming.uid == request.auth.uid && // UID in doc must match auth UID
-             (!incoming.keys().has('xp') || incoming.xp is number) &&
-             (!incoming.keys().has('streak') || incoming.streak is number);
-    }
-
-    // 2. Collection Rules
-    match /users/{userId} {
-      // Allow reading if it's the user's own profile
-      allow get: if isAuthenticated() && isOwner(userId);
-      allow list: if false; // Don't allow listing all users
-
-      // Allow creating/updating only if it's their own profile AND data is valid
-      allow create: if isAuthenticated() && isOwner(userId) && isValidUser();
-      allow update: if isAuthenticated() && isOwner(userId) && isValidUser();
       
-      // Allow delete only if it's the owner
-      allow delete: if isAuthenticated() && isOwner(userId);
+      // 1. Core Identity Checks
+      // 'uid' and 'email' are mandatory
+      let hasRequiredFields = incoming.keys().hasAll(['uid', 'email']);
+      
+      // 2. Type & Security Checks
+      let isCorrectOwner = incoming.uid == request.auth.uid; // User cannot spoof UID
+      let isEmailString = incoming.email is string;
+      let isUidString = incoming.uid is string;
+
+      // 3. Optional Field Checks (Only validate if they exist)
+      // Check XP
+      let isXpValid = !('xp' in incoming) || incoming.xp is number;
+      
+      // Check Streak
+      let isStreakValid = !('streak' in incoming) || incoming.streak is number;
+
+      // Check Persona (Based on your App's logic)
+      let isPersonaValid = !('persona' in incoming) || 
+                           (incoming.persona is string && 
+                           incoming.persona in ['Student', 'Fresher', 'Experienced', 'Employee']);
+
+      return hasRequiredFields && 
+             isCorrectOwner && 
+             isEmailString && 
+             isUidString && 
+             isXpValid && 
+             isStreakValid &&
+             isPersonaValid;
     }
-    
-    // Default: Deny everything else
+
+    // Rules for the Users Collection
+    match /users/{userId} {
+      allow get: if isAuthenticated() && isOwner(userId);
+      allow delete: if isAuthenticated() && isOwner(userId);
+      
+      // 'create' and 'update' are checked against the FINAL state of the document
+      allow create, update: if isAuthenticated() && isOwner(userId) && isValidUser();
+    }
+
+    // Default Deny (Recursive) - Blocks everything else
     match /{document=**} {
       allow read, write: if false;
     }
